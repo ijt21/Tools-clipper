@@ -1,83 +1,56 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Clipper Offline — Split Single Video (9:16) (Notifikasi)</title>
-<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clipper Debug — Log Viewer</title>
 <style>
-  body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#071022;color:#e6eef8;padding:18px;display:flex;justify-content:center}
-  .card{width:980px;max-width:98%;background:linear-gradient(180deg,#081126,#071022);padding:18px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
-  h1{margin:0 0 8px;font-size:20px}
-  p.lead{color:#9fb6d9;margin:0 0 12px}
-  label{display:block;margin-top:8px;color:#cfe9ff}
-  input[type=file], input[type=text]{width:100%;padding:10px;border-radius:8px;border:none;background:#061224;color:#e6eef8}
-  .row{display:flex;gap:12px;margin-top:10px}
-  .btn{background:#0b74de;color:white;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
-  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
-  .note{color:#9fb6d9;font-size:13px;margin-top:8px}
-  .preview{display:flex;gap:12px;margin-top:12px}
-  .phone{width:360px;height:640px;border-radius:16px;background:black;border:6px solid #081227;overflow:hidden;display:flex;flex-direction:column}
-  .slot{flex:1;display:flex;align-items:center;justify-content:center;color:#9fb6d9}
-  video{max-width:100%;max-height:100%}
-  .status{margin-top:12px;color:#cfe9ff}
-  .progress{height:10px;background:#071225;border-radius:8px;overflow:hidden;margin-top:8px}
-  .progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#29b6f6,#7c4dff)}
-  .download{margin-top:12px}
-  .err{color:#ffb4b4;margin-top:8px}
-  pre{background:#061224;padding:10px;border-radius:8px;overflow:auto;color:#cfe9ff}
-  .toast { position: fixed; right: 16px; bottom: 16px; background: rgba(10,20,30,0.95); color: #dff; padding: 12px 14px; border-radius: 10px; box-shadow: 0 6px 30px rgba(0,0,0,0.6); transform: translateY(0); transition: transform .25s ease, opacity .25s; opacity: 1; z-index: 99999; max-width: 320px;}
-  .toast.hidden{opacity:0;transform:translateY(12px);}
-  /* overlay big progress */
-  .overlay { position: fixed; inset: 0; display: none; align-items:center; justify-content:center; z-index:99990; background: rgba(0,0,0,0.5); }
-  .overlay .box { background: #071225; padding: 24px; border-radius: 12px; text-align:center; color:#dff; box-shadow: 0 12px 40px rgba(0,0,0,0.6); width: 90%; max-width:420px; }
-  .overlay .pct { font-size:36px; font-weight:700; margin-bottom:8px; }
-  .overlay .msg { font-size:14px; color:#bcd6ff; margin-bottom:12px; }
-  .spinner { width:48px;height:48px;border-radius:50%;border:5px solid rgba(255,255,255,0.08);border-top-color:#29b6f6;animation:spin 1s linear infinite;margin:0 auto 12px;}
-  @keyframes spin {to {transform: rotate(360deg);} }
-  @media (max-width:900px){ .row{flex-direction:column} .preview{flex-direction:column;align-items:center} .phone{width:300px;height:533px} }
+  body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#071022;color:#e6eef8;padding:14px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:18px;margin:0 0 8px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  input[type=file], input[type=text]{padding:8px;border-radius:6px;border:none;background:#061224;color:#e6eef8}
+  button{padding:8px 12px;border-radius:8px;border:none;background:#0b74de;color:white;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .note{color:#9fb6d9;margin:8px 0;font-size:13px}
+  .panels{display:flex;gap:12px}
+  .panel{flex:1;background:#061224;padding:8px;border-radius:8px;min-height:220px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+  .panel h3{margin:0 0 6px;font-size:14px;color:#cfe9ff}
+  .log{font-family:monospace;font-size:12px;white-space:pre-wrap;color:#dfeffd}
+  .err{color:#ffb4b4}
+  .diag{margin-top:8px;padding:8px;background:#071225;border-radius:6px;color:#bcd6ff;font-size:13px}
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Clipper Offline — Split Single Video (9:16)</h1>
-    <p class="lead">Pilih file lokal (mis. hasil unduhan YouTube) lalu klik Proses. Anda akan menerima notifikasi progress di layar.</p>
+  <div class="wrap">
+    <h1>Clipper — Debug &amp; Log Viewer</h1>
+    <p class="note">Halaman ini akan menampilkan semua console log &amp; log ffmpeg.wasm. Tekan <strong>Load FFmpeg</strong> lalu <strong>Proses</strong>.</p>
 
-    <label for="file">Pilih file video</label>
-    <input id="file" type="file" accept="video/*">
-
-    <div class="row" style="margin-top:10px;">
-      <button id="btnProcess" class="btn">Proses jadi 9:16</button>
-      <button id="btnCancel" class="btn ghost" disabled>Batal</button>
-      <button id="btnNotify" class="btn ghost">Izinkan Notifikasi</button>
+    <div class="controls">
+      <input id="file" type="file" accept="video/*" />
+      <button id="btnLoad">Load FFmpeg</button>
+      <button id="btnRun">Proses</button>
+      <button id="btnDiag" class="ghost">Show Diagnostics</button>
+      <button id="btnClear" class="ghost">Clear Log</button>
     </div>
 
-    <div class="note" id="note">Klik <em>Izinkan Notifikasi</em> agar muncul notifikasi sistem saat proses dimulai/selesai (opsional).</div>
-
-    <div class="preview" aria-live="polite">
-      <div class="phone">
-        <div class="slot" id="previewTop">Preview TOP</div>
-        <div class="slot" id="previewBottom">Preview BOTTOM</div>
+    <div class="panels" style="margin-bottom:12px">
+      <div class="panel">
+        <h3>Console &amp; App Log</h3>
+        <div id="consoleLog" class="log"></div>
       </div>
-      <div style="flex:1">
-        <div class="status" id="status">Status: menunggu file</div>
-        <div class="progress" id="progress" style="display:none"><i></i></div>
-        <div class="download" id="downloadArea" style="display:none"></div>
-        <div class="err" id="err" style="display:none"></div>
+
+      <div class="panel">
+        <h3>ffmpeg.wasm Log</h3>
+        <div id="ffLog" class="log"></div>
       </div>
     </div>
-  </div>
 
-  <!-- toast -->
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-
-  <!-- big overlay progress -->
-  <div id="overlay" class="overlay">
-    <div class="box">
-      <div class="spinner" id="spinner"></div>
-      <div class="pct" id="pct">0%</div>
-      <div class="msg" id="overlayMsg">Menyiapkan...</div>
-      <div style="font-size:13px;color:#8fb0df" id="overlaySub">Jangan tutup tab</div>
+    <div class="panel" style="min-height:120px">
+      <h3>Diagnostics &amp; Suggestions</h3>
+      <div id="diagArea" class="diag">
+        Tekan <strong>Show Diagnostics</strong> untuk melihat saran perbaikan (CORS, server lokal, Termux).
+      </div>
     </div>
   </div>
 
@@ -85,250 +58,143 @@
 import { createFFmpeg, fetchFile } from "https://unpkg.com/@ffmpeg/ffmpeg@0.11.8/dist/ffmpeg.min.js";
 const ffmpeg = createFFmpeg({ log: false });
 
-/* UI elements */
-const fileInput = document.getElementById('file');
-const btnProcess = document.getElementById('btnProcess');
-const btnCancel = document.getElementById('btnCancel');
-const btnNotify = document.getElementById('btnNotify');
-const statusEl = document.getElementById('status');
-const progressBar = document.getElementById('progress');
-const progressInner = progressBar.querySelector('i');
-const downloadArea = document.getElementById('downloadArea');
-const errEl = document.getElementById('err');
-const previewTop = document.getElementById('previewTop');
-const previewBottom = document.getElementById('previewBottom');
+const consoleLog = document.getElementById('consoleLog');
+const ffLog = document.getElementById('ffLog');
+const diagArea = document.getElementById('diagArea');
 
-const toastEl = document.getElementById('toast');
-const overlay = document.getElementById('overlay');
-const pctEl = document.getElementById('pct');
-const overlayMsg = document.getElementById('overlayMsg');
-const overlaySub = document.getElementById('overlaySub');
-
-let cancelled = false;
-
-/* Notification helpers */
-function showToast(msg, timeout=5000) {
-  toastEl.textContent = msg;
-  toastEl.classList.remove('hidden');
-  setTimeout(()=>{ toastEl.classList.add('hidden'); }, timeout);
-}
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    showToast('Browser tidak mendukung Notification API');
-    return false;
-  }
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    showToast('Notifikasi diizinkan');
-    return true;
-  } else {
-    showToast('Notifikasi tidak diizinkan');
-    return false;
-  }
-}
-function notifySystem(title, body) {
-  if (Notification.permission === 'granted') {
-    try {
-      new Notification(title, { body });
-    } catch(e) {
-      console.warn('Notification error', e);
-    }
-  }
+function appendConsole(msg, type='log') {
+  const el = document.createElement('div');
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  if (type === 'error') el.classList.add('err');
+  consoleLog.appendChild(el);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
 }
 
-/* Preview handling */
-fileInput.addEventListener('change', () => {
-  const f = fileInput.files[0];
-  if(!f) { previewTop.textContent = 'Preview TOP'; previewBottom.textContent = 'Preview BOTTOM'; statusEl.textContent = 'Status: menunggu file'; return; }
-  const url = URL.createObjectURL(f);
-  const v1 = document.createElement('video'); v1.src = url; v1.autoplay = true; v1.muted = true; v1.loop = true; v1.playsInline = true;
-  const v2 = document.createElement('video'); v2.src = url; v2.autoplay = true; v2.muted = true; v2.loop = true; v2.playsInline = true;
-  v1.style.maxWidth='100%'; v2.style.maxWidth='100%';
-  previewTop.innerHTML=''; previewTop.appendChild(v1);
-  previewBottom.innerHTML=''; previewBottom.appendChild(v2);
-  statusEl.textContent = `File siap: ${f.name}`;
-});
+(function () {
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = function(...args) {
+    origLog.apply(console, args);
+    appendConsole(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '), 'log');
+  };
+  console.error = function(...args) {
+    origError.apply(console, args);
+    appendConsole(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '), 'error');
+  };
+})();
 
-/* Button: request notification */
-btnNotify.addEventListener('click', async () => {
-  await requestNotificationPermission();
-});
+window.addEventListener('error', (ev) => { console.error('Window error:', ev.message || ev); });
+window.addEventListener('unhandledrejection', (ev) => { console.error('Unhandled promise rejection:', ev.reason || ev); });
 
-/* overlay helpers */
-function showOverlay(pct, message) {
-  overlay.style.display = 'flex';
-  pctEl.textContent = `${Math.round(pct)}%`;
-  overlayMsg.textContent = message || '';
-}
-function hideOverlay() {
-  overlay.style.display = 'none';
-}
-
-/* progress UI */
-function setProgressPercent(pct) {
-  progressBar.style.display = 'block';
-  progressInner.style.width = `${pct}%`;
-  pctEl.textContent = `${Math.round(pct)}%`;
-}
-
-/* load ffmpeg when first needed */
-async function ensureFFmpeg() {
-  if (!ffmpeg.isLoaded()) {
-    statusEl.textContent = 'Memuat ffmpeg.wasm — tunggu sebentar...';
-    showToast('Memuat engine ffmpeg.wasm (sekali saja)', 8000);
-    await ffmpeg.load();
-    statusEl.textContent = 'ffmpeg siap';
-    showToast('ffmpeg siap');
-  }
-}
-
-/* Attach logger & progress to ffmpeg */
 ffmpeg.setLogger(({ type, message }) => {
-  // minimal logging to status for long messages
-  if (message && message.length < 2000) {
-    // optionally show incremental logs for debug
-    // console.log('ffmpeg log', type, message);
+  if (message && message.length) {
+    const msg = `[${type}] ${message}`;
+    const el = document.createElement('div');
+    el.textContent = msg;
+    ffLog.appendChild(el);
+    ffLog.scrollTop = ffLog.scrollHeight;
   }
 });
 ffmpeg.setProgress(({ ratio }) => {
-  const pct = Math.min(99, Math.round(ratio * 100));
-  setProgressPercent(pct);
-  overlayMsg.textContent = 'Memproses video...';
+  const pct = Math.round(ratio * 100);
+  appendConsole(`ffmpeg progress: ${pct}%`);
 });
 
-/* main process function */
-async function runProcess() {
-  const file = fileInput.files[0];
-  if(!file) { alert('Pilih file terlebih dahulu'); return; }
-  cancelled = false;
-  btnCancel.disabled = false;
-  btnProcess.disabled = true;
-  downloadArea.style.display = 'none';
-  errEl.style.display = 'none';
-  statusEl.textContent = 'Menyiapkan...';
-  showToast('Menyiapkan proses');
-
-  try {
-    await ensureFFmpeg();
-  } catch (e) {
-    errEl.style.display = 'block';
-    errEl.textContent = 'Gagal memuat ffmpeg.wasm: ' + e.message;
-    btnProcess.disabled = false;
-    return;
+async function runDiagnostics() {
+  const info = [];
+  info.push(`Page origin: ${location.origin}`);
+  info.push(`Page protocol: ${location.protocol}`);
+  info.push(`User agent: ${navigator.userAgent}`);
+  if (location.protocol === 'file:') {
+    info.push('⚠️ Halaman dibuka via file:// — banyak browser memblokir fetch/WASM. Disarankan buka lewat HTTP lokal (Termux).');
+  } else {
+    info.push('Halaman via HTTP(S) — CDN harus bisa diakses.');
   }
-
-  const inName = 'input_'+Date.now()+'.mp4';
-  const outName = 'output_1080x1920.mp4';
-  const outNameWebm = 'output_1080x1920.webm';
-
+  appendConsole('Menguji koneksi ke CDN ffmpeg.wasm ...');
   try {
-    statusEl.textContent = 'Membaca file ke memory...';
-    showOverlay(2, 'Membaca file ke memory...');
-    const data = await fetchFile(file);
-    ffmpeg.FS('writeFile', inName, data);
+    const r = await fetch('https://unpkg.com/@ffmpeg/ffmpeg@0.11.8/dist/ffmpeg.min.js', { method: 'HEAD' });
+    appendConsole(`CDN response status: ${r.status} ${r.statusText}`);
+    info.push('CDN reachable: ' + (r.ok ? 'OK' : `${r.status} ${r.statusText}`));
+  } catch (err) {
+    appendConsole('CDN fetch error: ' + (err.message || err));
+    info.push('Gagal menghubungi CDN: ' + (err.message || err));
+  }
+  info.push('');
+  info.push('Saran:');
+  info.push('- Jika muncul error CORS/Failed to fetch: jalankan server lokal (Termux) atau gunakan PC.');
+  info.push('- Jika muncul Unknown encoder / could not find codec: build ffmpeg.wasm tidak menyertakan encoder (pakai Termux native ffmpeg).');
+  diagArea.innerText = info.join('\\n');
+}
 
+document.getElementById('btnLoad').addEventListener('click', async () => {
+  appendConsole('Load FFmpeg ditekan — memulai load ...');
+  try {
+    if (!ffmpeg.isLoaded()) {
+      await ffmpeg.load();
+      appendConsole('ffmpeg.wasm berhasil dimuat.');
+      alert('ffmpeg.wasm berhasil dimuat. Tekan Proses untuk menjalankan.');
+    } else {
+      appendConsole('ffmpeg sudah dimuat.');
+      alert('ffmpeg sudah dimuat.');
+    }
+  } catch (e) {
+    console.error('Gagal load ffmpeg.wasm:', e);
+    appendConsole('ERROR saat load: ' + (e && e.message ? e.message : String(e)));
+    alert('Gagal memuat ffmpeg.wasm — lihat log.');
+  }
+});
+
+document.getElementById('btnRun').addEventListener('click', async () => {
+  const f = document.getElementById('file').files[0];
+  if (!f) { appendConsole('Tidak ada file dipilih — abort'); alert('Pilih file terlebih dahulu'); return; }
+  appendConsole('Proses dimulai: ' + f.name);
+  try {
+    if (!ffmpeg.isLoaded()) {
+      appendConsole('ffmpeg belum dimuat — mencoba load otomatis...');
+      try { await ffmpeg.load(); appendConsole('ffmpeg auto-load OK'); } 
+      catch(e){ console.error('Auto-load gagal:', e); alert('Gagal load ffmpeg, lihat log'); return; }
+    }
+    const inName = 'input_debug.mp4';
+    const outName = 'out_debug_1080x1920.mp4';
+    appendConsole('Menulis file ke FS (memory)...');
+    const data = await fetchFile(f);
+    ffmpeg.FS('writeFile', inName, data);
+    appendConsole('Menjalankan ffmpeg (filter/crop/vstack)...');
     const filter = "[0:v]scale=1080:-1,pad=1080:1920:0:(1920-ih)/2,crop=1080:960:0:0[top];" +
                    "[0:v]scale=1080:-1,pad=1080:1920:0:(1920-ih)/2,crop=1080:960:0:960[bottom];" +
                    "[top][bottom]vstack=2[out]";
-
-    const argsMp4 = ["-i", inName, "-filter_complex", filter, "-map", "[out]", "-map", "0:a?", "-c:v", "libx264", "-crf", "23", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", outName];
-
-    const argsWebm = ["-i", inName, "-filter_complex", filter, "-map", "[out]", "-map", "0:a?", "-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-c:a", "libopus", outNameWebm];
-
-    // start mp4 encode
-    statusEl.textContent = 'Memulai encoding (MP4) — ini bisa lama';
-    showToast('Memulai encoding (MP4)');
-    showOverlay(5, 'Memulai encoding (MP4) — jangan tutup tab');
+    const args = ["-i", inName, "-filter_complex", filter, "-map", "[out]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", outName];
+    appendConsole('Args: ' + args.join(' '));
     try {
-      await ffmpeg.run(...argsMp4);
-      // read result
-      const dataOut = ffmpeg.FS('readFile', outName);
-      const blob = new Blob([dataOut.buffer], { type: 'video/mp4' });
-      const url = URL.createObjectURL(blob);
-      downloadArea.innerHTML = `<a href="${url}" download="${outName}" class="btn">Download MP4 (1080x1920)</a>`;
-      downloadArea.style.display = 'block';
-      statusEl.textContent = 'Selesai: MP4 dibuat';
-      showToast('Selesai: MP4 dibuat', 8000);
-      notifySystem('Clipper', 'Selesai: MP4 dibuat');
-      setProgressPercent(100);
-      hideOverlay();
-      // cleanup
+      await ffmpeg.run(...args);
+      appendConsole('ffmpeg selesai tanpa error.');
+      const result = ffmpeg.FS('readFile', outName);
+      appendConsole('Output size: ' + result.length + ' bytes');
+      const url = URL.createObjectURL(new Blob([result.buffer], { type: 'video/mp4' }));
+      const a = document.createElement('a'); a.href = url; a.download = outName; a.textContent = 'Download result: ' + outName;
+      a.style.display = 'block'; a.style.marginTop='8px';
+      consoleLog.appendChild(a);
+      appendConsole('Selesai: file siap diunduh (lihat di log).');
+      alert('Selesai: hasil siap diunduh (lihat link di log).');
+    } catch (e) {
+      console.error('ffmpeg.run error:', e);
+      appendConsole('ffmpeg.run error: ' + (e && e.message ? e.message : String(e)), 'error');
+      alert('ffmpeg.run mengeluarkan error — lihat log.');
+    } finally {
       try { ffmpeg.FS('unlink', inName); } catch(e){}
       try { ffmpeg.FS('unlink', outName); } catch(e){}
-      btnProcess.disabled = false;
-      btnCancel.disabled = true;
-      return;
-    } catch (errMp4) {
-      console.warn('MP4 failed:', errMp4);
-      statusEl.textContent = 'MP4 encoding gagal, mencoba WebM fallback';
-      showToast('MP4 gagal — mencoba WebM', 6000);
-      showOverlay(10, 'Fallback: WebM encoding');
-      try {
-        await ffmpeg.run(...argsWebm);
-        const dataOut = ffmpeg.FS('readFile', outNameWebm);
-        const blob = new Blob([dataOut.buffer], { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        downloadArea.innerHTML = `<a href="${url}" download="${outNameWebm}" class="btn">Download WebM (1080x1920)</a>`;
-        downloadArea.style.display = 'block';
-        statusEl.textContent = 'Selesai: WebM dibuat';
-        showToast('Selesai: WebM dibuat', 8000);
-        notifySystem('Clipper', 'Selesai: WebM dibuat (fallback)');
-        setProgressPercent(100);
-        hideOverlay();
-        try { ffmpeg.FS('unlink', inName); } catch(e){}
-        try { ffmpeg.FS('unlink', outNameWebm); } catch(e){}
-        btnProcess.disabled = false;
-        btnCancel.disabled = true;
-        return;
-      } catch (errWebm) {
-        console.error('WebM failed:', errWebm);
-        errEl.style.display = 'block';
-        errEl.textContent = 'Proses gagal: ' + (errWebm.message || errWebm);
-        statusEl.textContent = 'Gagal memproses';
-        notifySystem('Clipper', 'Gagal memproses video');
-        hideOverlay();
-        btnProcess.disabled = false;
-        btnCancel.disabled = true;
-        return;
-      }
     }
   } catch (e) {
-    console.error(e);
-    errEl.style.display = 'block';
-    errEl.textContent = 'Kesalahan: ' + (e.message || e);
-    statusEl.textContent = 'Gagal';
-    hideOverlay();
-    btnProcess.disabled = false;
-    btnCancel.disabled = true;
-    notifySystem('Clipper', 'Terjadi kesalahan saat memproses');
-  }
-}
-
-/* cancel button - best effort (ffmpeg.wasm doesn't support direct cancel API in all versions) */
-btnCancel.addEventListener('click', () => {
-  cancelled = true;
-  // try to signal by unloading (best effort)
-  showToast('Mencoba membatalkan... (jika didukung)');
-  try {
-    // no direct cancel API; provide UX feedback
-    statusEl.textContent = 'Permintaan batal dikirim; tunggu proses berhenti.';
-    hideOverlay();
-    btnProcess.disabled = false;
-    btnCancel.disabled = true;
-  } catch(e) {
-    console.warn('cancel error', e);
+    console.error('Error proses:', e);
+    appendConsole('Error proses: ' + (e && e.message ? e.message : String(e)), 'error');
+    alert('Error: lihat log.');
   }
 });
 
-btnProcess.addEventListener('click', () => {
-  runProcess();
-});
+document.getElementById('btnDiag').addEventListener('click', runDiagnostics);
+document.getElementById('btnClear').addEventListener('click', () => { consoleLog.innerText=''; ffLog.innerText=''; appendConsole('Log dibersihkan'); });
 
-/* initial small guidance */
-if ('Notification' in window && Notification.permission === 'default') {
-  // small hint to click Izinkan Notifikasi
-  showToast('Opsional: klik "Izinkan Notifikasi" untuk pemberitahuan sistem.');
-}
+appendConsole('Debug page siap. Tekan Load FFmpeg lalu Proses.');
 </script>
 </body>
 </html>
