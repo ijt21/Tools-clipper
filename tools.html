@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clipper Debug — ffmpeg.wasm Log Viewer</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#071022;color:#e6eef8;padding:14px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:18px;margin:0 0 8px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  input[type=file], input[type=text]{padding:8px;border-radius:6px;border:none;background:#061224;color:#e6eef8}
+  button{padding:8px 12px;border-radius:8px;border:none;background:#0b74de;color:white;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .note{color:#9fb6d9;margin:8px 0;font-size:13px}
+  .panels{display:flex;gap:12px}
+  .panel{flex:1;background:#061224;padding:8px;border-radius:8px;min-height:220px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+  .panel h3{margin:0 0 6px;font-size:14px;color:#cfe9ff}
+  .log{font-family:monospace;font-size:12px;white-space:pre-wrap;color:#dfeffd}
+  .err{color:#ffb4b4}
+  .diag{margin-top:8px;padding:8px;background:#071225;border-radius:6px;color:#bcd6ff;font-size:13px}
+  .overlay { position: fixed; inset: 0; display: none; align-items:center; justify-content:center; z-index:99990; background: rgba(0,0,0,0.5); }
+  .overlay .box { background: #071225; padding: 20px; border-radius: 10px; color:#dff; width:90%; max-width:420px; text-align:center; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Clipper — Debug & Log Viewer</h1>
+    <p class="note">Halaman ini menampilkan log lengkap untuk membantu menemukan mengapa tombol <strong>Proses</strong> tidak bereaksi pada perangkat Android. Jika you melihat pesan CORS / file:// / wasm streaming, jalankan file via HTTP lokal (lihat petunjuk di panel Diagnostics).</p>
+
+    <div class="controls">
+      <input id="apiBase" type="text" placeholder="(opsional) server API URL, bukan dipakai untuk debug" />
+      <input id="file" type="file" accept="video/*" />
+      <button id="btnLoad">Load FFmpeg</button>
+      <button id="btnRun">Proses</button>
+      <button id="btnDiag" class="ghost">Show Diagnostics</button>
+      <button id="btnClear" class="ghost">Clear Log</button>
+    </div>
+
+    <div class="panels" style="margin-bottom:12px">
+      <div class="panel">
+        <h3>Console & App Log</h3>
+        <div id="consoleLog" class="log"></div>
+      </div>
+
+      <div class="panel">
+        <h3>ffmpeg.wasm Log</h3>
+        <div id="ffLog" class="log"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="min-height:120px">
+      <h3>Diagnostics & Suggestions</h3>
+      <div id="diagArea" class="diag">
+        Tekan <strong>Show Diagnostics</strong> untuk melihat saran perbaikan (CORS, server lokal, Termux).
+      </div>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div id="overlay" class="overlay"><div class="box" id="overlayBox">Loading...</div></div>
+
+<script type="module">
+/*
+  Clipper Debug HTML
+  - Menangkap console logs dan window errors
+  - Menampilkan logs ffmpeg.wasm (via setLogger)
+  - Tombol Load FFmpeg untuk memicu pemuatan library (lihat hasil di log)
+  - Tombol Proses menjalankan operational pipeline (try-catch intensif)
+*/
+
+import { createFFmpeg, fetchFile } from "https://unpkg.com/@ffmpeg/ffmpeg@0.11.8/dist/ffmpeg.min.js";
+
+const ffmpeg = createFFmpeg({ log: false });
+
+/* UI elements */
+const consoleLog = document.getElementById('consoleLog');
+const ffLog = document.getElementById('ffLog');
+const diagArea = document.getElementById('diagArea');
+const overlay = document.getElementById('overlay');
+const overlayBox = document.getElementById('overlayBox');
+
+const btnLoad = document.getElementById('btnLoad');
+const btnRun = document.getElementById('btnRun');
+const btnDiag = document.getElementById('btnDiag');
+const btnClear = document.getElementById('btnClear');
+const fileInput = document.getElementById('file');
+
+function appendConsole(msg, type='log') {
+  const el = document.createElement('div');
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  if (type === 'error') el.classList.add('err');
+  consoleLog.appendChild(el);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+}
+
+/* override console functions to show in UI */
+(function () {
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = function(...args) {
+    origLog.apply(console, args);
+    appendConsole(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '), 'log');
+  };
+  console.error = function(...args) {
+    origError.apply(console, args);
+    appendConsole(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '), 'error');
+  };
+})();
+
+/* catch global errors */
+window.addEventListener('error', (ev) => {
+  console.error('Window error:', ev.message || ev);
+});
+window.addEventListener('unhandledrejection', (ev) => {
+  console.error('Unhandled promise rejection:', ev.reason || ev);
+});
+
+/* ffmpeg logs */
+ffmpeg.setLogger(({ type, message }) => {
+  // ignore verbose timestamp messages
+  if (message && message.length) {
+    const msg = `[${type}] ${message}`;
+    const el = document.createElement('div');
+    el.textContent = msg;
+    ffLog.appendChild(el);
+    ffLog.scrollTop = ffLog.scrollHeight;
+  }
+});
+ffmpeg.setProgress(({ ratio }) => {
+  const pct = Math.round(ratio * 100);
+  appendConsole(`ffmpeg progress: ${pct}%`);
+});
+
+/* helpers */
+function showOverlay(msg) {
+  overlayBox.textContent = msg;
+  overlay.style.display = 'flex';
+}
+function hideOverlay() {
+  overlay.style.display = 'none';
+}
+
+/* Diagnostics checker */
+function runDiagnostics() {
+  const info = [];
+  // check origin
+  info.push(`Page origin: ${location.origin}`);
+  info.push(`Page protocol: ${location.protocol}`);
+  info.push(`User agent: ${navigator.userAgent}`);
+  // detect file:// usage
+  if (location.protocol === 'file:') {
+    info.push('⚠️ Halaman dibuka via file:// — banyak browser memblokir fetch/WASM. Disarankan buka lewat HTTP lokal (lihat instruksi).');
+  } else {
+    info.push('Ok: Halaman dibuka lewat HTTP (atau data) — CORS masih mungkin terjadi jika CDN diblokir.');
+  }
+  // check fetch to cdn
+  info.push('Menguji konektivitas CDN ffmpeg.wasm (HEAD request) ...');
+  appendConsole('Menguji konektivitas CDN ffmpeg.wasm...');
+  fetch('https://unpkg.com/@ffmpeg/ffmpeg@0.11.8/dist/ffmpeg.min.js', { method: 'HEAD' })
+    .then(r => {
+      appendConsole(`CDN response status: ${r.status} ${r.statusText}`);
+      if (r.ok) {
+        diagArea.innerText = info.join('\\n') + '\\n\\nCDN reachable: OK';
+      } else {
+        diagArea.innerText = info.join('\\n') + `\\n\\nCDN status: ${r.status} ${r.statusText} — kemungkinan diblokir`;
+      }
+    })
+    .catch(err => {
+      appendConsole('CDN fetch error: ' + (err.message || err));
+      diagArea.innerText = info.join('\\n') + '\\n\\nGagal menghubungi CDN: ' + (err.message || err);
+    });
+  // more suggestions
+  const suggestions = [
+    'Saran jika bermasalah:',
+    '- Jalankan server lokal di ponsel: Termux -> cd ke folder html -> python3 -m http.server 8000 -> buka http://127.0.0.1:8000/clipper_debug.html',
+    '- Jika tidak ingin Termux, gunakan PC untuk membuka halaman lewat http:// (lebih stabil).',
+    '- Jika browser menolak load WASM, coba browser Chrome/Edge desktop.',
+    '- Jika log menunjukkan \"wasm streaming compile failed / unexpected MIME type / CORS\" -> server lokal perlu dipakai.'
+  ];
+  diagArea.innerText = diagArea.innerText + '\\n\\n' + suggestions.join('\\n');
+}
+
+/* Load ffmpeg handler */
+btnLoad.addEventListener('click', async () => {
+  appendConsole('Tombol Load FFmpeg ditekan — memulai load ffmpeg.wasm ...');
+  showOverlay('Memuat ffmpeg.wasm — tunggu...');
+  try {
+    if (!ffmpeg.isLoaded()) {
+      await ffmpeg.load();
+      appendConsole('ffmpeg.wasm berhasil dimuat.');
+      alert('ffmpeg.wasm berhasil dimuat. Coba tekan Proses dengan file anda.');
+    } else {
+      appendConsole('ffmpeg sudah dimuat sebelumnya.');
+      alert('ffmpeg sudah dimuat.');
+    }
+  } catch (e) {
+    console.error('Gagal load ffmpeg.wasm:', e);
+    const msg = (e && e.message) ? e.message : String(e);
+    appendConsole('ERROR saat load: ' + msg);
+    // detect common error patterns
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS') || msg.includes('wasm streaming compile failed')) {
+      appendConsole('Kemungkinan masalah CORS / file:// / CDN diblokir. Coba jalankan lewat HTTP lokal (python -m http.server).');
+    }
+    alert('Gagal memuat ffmpeg.wasm — lihat log untuk detail.');
+  } finally {
+    hideOverlay();
+  }
+});
+
+/* Proses button */
+btnRun.addEventListener('click', async () => {
+  const f = fileInput.files[0];
+  if (!f) {
+    appendConsole('Tidak ada file dipilih — proses dibatalkan.');
+    alert('Pilih file terlebih dahulu.');
+    return;
+  }
+  appendConsole('Proses dimulai untuk file: ' + f.name);
+  showOverlay('Menyiapkan dan memproses — lihat log untuk detail');
+  try {
+    if (!ffmpeg.isLoaded()) {
+      appendConsole('ffmpeg belum dimuat — mencoba load otomatis...');
+      try {
+        await ffmpeg.load();
+        appendConsole('ffmpeg berhasil dimuat (auto).');
+      } catch (e) {
+        console.error('Auto-load ffmpeg gagal:', e);
+        appendConsole('Auto-load ffmpeg gagal — proses abort.');
+        alert('Gagal memuat ffmpeg.wasm; lihat log. Pertimbangkan jalankan server lokal.');
+        hideOverlay();
+        return;
+      }
+    }
+
+    // write file into FS
+    const inName = 'input_debug.mp4';
+    const outName = 'out_debug_1080x1920.mp4';
+    appendConsole('Menulis file input ke FS ffmpeg.wasm (memory)...');
+    const data = await fetchFile(f);
+    ffmpeg.FS('writeFile', inName, data);
+    appendConsole('File ditulis: ' + inName + ' (size: ' + data.length + ' bytes)');
+
+    // Compose filter (same as earlier)
+    const filter = "[0:v]scale=1080:-1,pad=1080:1920:0:(1920-ih)/2,crop=1080:960:0:0[top];" +
+                   "[0:v]scale=1080:-1,pad=1080:1920:0:(1920-ih)/2,crop=1080:960:0:960[bottom];" +
+                   "[top][bottom]vstack=2[out]";
+
+    const args = ["-i", inName, "-filter_complex", filter, "-map", "[out]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", outName];
+
+    appendConsole('Menjalankan ffmpeg dengan args: ' + args.join(' '));
+    try {
+      await ffmpeg.run(...args);
+      appendConsole('ffmpeg selesai tanpa error.');
+      const result = ffmpeg.FS('readFile', outName);
+      appendConsole('Output dibaca dari FS, size: ' + result.length + ' bytes.');
+      const url = URL.createObjectURL(new Blob([result.buffer], { type: 'video/mp4' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = outName;
+      a.textContent = 'Download result: ' + outName;
+      a.style.display = 'block';
+      a.style.marginTop = '6px';
+      document.getElementById('consoleLog').appendChild(a);
+      appendConsole('Selesai: file siap diunduh.');
+      alert('Selesai: hasil siap diunduh (lihat link di log).');
+    } catch (e) {
+      console.error('ffmpeg.run error:', e);
+      appendConsole('ffmpeg.run mengeluarkan error: ' + (e && e.message ? e.message : String(e)), 'error');
+      // check for common causes
+      const emsg = (e && e.message) ? e.message.toLowerCase() : '';
+      if (emsg.includes('could not find codec') || emsg.includes('Unknown encoder')) {
+        appendConsole('Kemungkinan encoder (libx264/aac) tidak tersedia di WASM build. Coba gunakan fallback WebM build atau coba Termux ffmpeg native.');
+      } else if (emsg.includes('memory') || emsg.includes('out of memory')) {
+        appendConsole('Terjadi kekurangan memori saat encoding. Coba file yang lebih kecil atau gunakan Termux native ffmpeg.');
+      } else {
+        appendConsole('Error tidak dikenali — periksa log ffmpeg.wasm di panel sebelah.');
+      }
+    } finally {
+      // cleanup FS (best effort)
+      try { ffmpeg.FS('unlink', inName); } catch(e){}
+      try { ffmpeg.FS('unlink', outName); } catch(e){}
+    }
+  } catch (e) {
+    console.error('Unexpected error during process:', e);
+    appendConsole('Unexpected error: ' + (e && e.message ? e.message : String(e)), 'error');
+  } finally {
+    hideOverlay();
+  }
+});
+
+/* diagnostics */
+btnDiag.addEventListener('click', runDiagnostics);
+
+/* clear log */
+btnClear.addEventListener('click', () => {
+  consoleLog.innerText = '';
+  ffLog.innerText = '';
+  appendConsole('Log dibersihkan.');
+});
+
+/* initial log */
+console.log('Debug page siap. Tekan "Load FFmpeg" lalu "Proses". Jika gagal, tekan "Show Diagnostics".');
+
+</script>
+</body>
+</html>
